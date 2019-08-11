@@ -1,6 +1,5 @@
-#![feature(futures_api, pin, async_await, await_macro, arbitrary_self_types)]
+#![feature(async_await, arbitrary_self_types)]
 #![feature(generators)]
-#![feature(dbg_macro)]
 #![feature(nll)]
 #![feature(optin_builtin_traits)]
 #![crate_type = "lib"] 
@@ -243,11 +242,11 @@ mod tests {
 
     async fn inc_task(arc_async_mutex: Arc<AsyncMutex<NumCell>>, mut sender: mpsc::Sender<()>) {
         {
-            let mut guard = await!(arc_async_mutex.lock());
+            let mut guard = arc_async_mutex.lock().await;
             let resource = &mut *guard;
             resource.num += 1;
         }
-        await!(sender.send(())).unwrap();
+        sender.send(()).await.unwrap();
     }
 
     #[test]
@@ -270,7 +269,7 @@ mod tests {
 
         thread_pool.run(async move {
             for _ in 0 .. N {
-                await!(receiver.next()).unwrap();
+                receiver.next().await.unwrap();
             }
         });
 
@@ -284,7 +283,7 @@ mod tests {
         let async_mutex = AsyncMutex::new(NumCell { num: 0 });
 
         let task = async move {
-            await!(async_mutex.lock().then(|mut num_cell| {
+            async_mutex.lock().then(|mut num_cell| {
                 num_cell.num += 1;
 
                 let mut _nested_task = async_mutex.lock().then(|mut num_cell| {
@@ -295,7 +294,7 @@ mod tests {
 
                 let num = num_cell.num;
                 future::ready(num)
-            }))
+            }).await
         };
 
         assert_eq!(thread_pool.run(task), 1);
